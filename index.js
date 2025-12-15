@@ -801,7 +801,7 @@ app.use((req, res) => {
 });
 
 // Start server
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 807;
 app.listen(PORT, () => {
   console.log(`
 🎉 Festival TTS API Server Started!
