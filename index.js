@@ -563,7 +563,20 @@ app.post('/api/generate', async (req, res) => {
       outputFormat: format.toLowerCase()
     });
 
-    res.json(result);
+    // Read the file as binary data
+    const filePath = path.join(__dirname, 'audio-output', result.filename);
+    const audioBuffer = fs.readFileSync(filePath);
+    
+    // Convert Buffer to Uint8Array for the response
+    const uint8Array = new Uint8Array(audioBuffer);
+    
+    // Add bodyBytes to result
+    const responseData = {
+      ...result,
+      bodyBytes: Array.from(uint8Array) // Convert Uint8Array to array for JSON serialization
+    };
+
+    res.json(responseData);
 
   } catch (error) {
     console.error('Generation error:', error);
@@ -599,6 +612,19 @@ app.get('/api/generate/quick', async (req, res) => {
 
     log('✅ TTS completed', result);
 
+    // Read the file as binary data
+    const filePath = path.join(__dirname, 'audio-output', result.filename);
+    const audioBuffer = fs.readFileSync(filePath);
+    
+    // Convert Buffer to Uint8Array for the response
+    const uint8Array = new Uint8Array(audioBuffer);
+    
+    // Add bodyBytes to result
+    const responseData = {
+      ...result,
+      bodyBytes: Array.from(uint8Array) // Convert Uint8Array to array for JSON serialization
+    };
+
     if (req.query.download === 'true') {
       log('⬇️ Redirecting to download', result.filename);
       res.redirect(`/api/download/${result.filename}`);
@@ -606,7 +632,7 @@ app.get('/api/generate/quick', async (req, res) => {
       log('▶️ Redirecting to stream', result.filename);
       res.redirect(`/api/stream/${result.filename}`);
     } else {
-      res.json(result);
+      res.json(responseData);
     }
 
   } catch (error) {
