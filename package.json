@@ -1,0 +1,22 @@
+{
+  "name": "festival-tts-api",
+  "version": "1.0.0",
+  "description": "REST API for Festival Text-to-Speech Generation",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": ["tts", "audio", "festival", "api", "text-to-speech"],
+  "author": "Your Name",
+  "license": "MIT"
+}
