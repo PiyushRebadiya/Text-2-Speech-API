@@ -27,145 +27,193 @@ class FestivalAudioGenerator {
     return [
       {
         id: 'en-US-AvaMultilingualNeural',
+        voiceId: 1,
         name: 'Ava (English US)',
+        voiceName: 'Ava (English US)',
         locale: 'en-US',
         gender: 'Female',
         language: 'en',
+        languageName: 'English',
         provider: 'microsoft',
         description: 'Clear American English - Female'
       },
       {
         id: 'en-US-AndrewMultilingualNeural',
+        voiceId: 2,
         name: 'Andrew (English US)',
+        voiceName: 'Andrew (English US)',
         locale: 'en-US',
         gender: 'Male',
         language: 'en',
+        languageName: 'English',
         provider: 'microsoft',
         description: 'Professional American English - Male'
       },
       {
         id: 'en-GB-SoniaNeural',
+        voiceId: 3,
         name: 'Sonia (English UK)',
+        voiceName: 'Sonia (English UK)',
         locale: 'en-GB',
         gender: 'Female',
         language: 'en',
+        languageName: 'English',
         provider: 'microsoft',
         description: 'British English - Female'
       },
       {
         id: 'en-GB-RyanNeural',
+        voiceId: 4,
         name: 'Ryan (English UK)',
+        voiceName: 'Ryan (English UK)',
         locale: 'en-GB',
         gender: 'Male',
         language: 'en',
+        languageName: 'English',
         provider: 'microsoft',
         description: 'British English - Male'
       },
       {
         id: 'hi-IN-SwaraNeural',
+        voiceId: 5,
         name: 'Swara (Hindi)',
+        voiceName: 'Swara (Hindi)',
         locale: 'hi-IN',
         gender: 'Female',
         language: 'hi',
+        languageName: 'Hindi',
         provider: 'microsoft',
         description: 'Hindi - Female'
       },
       {
         id: 'hi-IN-MadhurNeural',
+        voiceId: 6,
         name: 'Madhur (Hindi)',
+        voiceName: 'Madhur (Hindi)',
         locale: 'hi-IN',
         gender: 'Male',
         language: 'hi',
+        languageName: 'Hindi',
         provider: 'microsoft',
         description: 'Hindi - Male'
       },
       {
         id: 'gu-IN-DhwaniNeural',
+        voiceId: 7,
         name: 'Dhwani (Gujarati)',
+        voiceName: 'Dhwani (Gujarati)',
         locale: 'gu-IN',
         gender: 'Female',
         language: 'gu',
+        languageName: 'Gujarati',
         provider: 'microsoft',
         description: 'Gujarati - Female'
       },
       {
         id: 'gu-IN-NiranjanNeural',
+        voiceId: 8,
         name: 'Niranjan (Gujarati)',
+        voiceName: 'Niranjan (Gujarati)',
         locale: 'gu-IN',
         gender: 'Male',
         language: 'gu',
+        languageName: 'Gujarati',
         provider: 'microsoft',
         description: 'Gujarati - Male'
       },
       {
         id: 'mr-IN-AarohiNeural',
+        voiceId: 9,
         name: 'Aarohi (Marathi)',
+        voiceName: 'Aarohi (Marathi)',
         locale: 'mr-IN',
         gender: 'Female',
         language: 'mr',
+        languageName: 'Marathi',
         provider: 'microsoft',
         description: 'Marathi - Female'
       },
       {
         id: 'mr-IN-ManoharNeural',
+        voiceId: 10,
         name: 'Manohar (Marathi)',
+        voiceName: 'Manohar (Marathi)',
         locale: 'mr-IN',
         gender: 'Male',
         language: 'mr',
+        languageName: 'Marathi',
         provider: 'microsoft',
         description: 'Marathi - Male'
       },
       {
         id: 'ta-IN-PallaviNeural',
+        voiceId: 11,
         name: 'Pallavi (Tamil)',
+        voiceName: 'Pallavi (Tamil)',
         locale: 'ta-IN',
         gender: 'Female',
         language: 'ta',
+        languageName: 'Tamil',
         provider: 'microsoft',
         description: 'Tamil - Female'
       },
       {
         id: 'te-IN-MohanNeural',
+        voiceId: 12,
         name: 'Mohan (Telugu)',
+        voiceName: 'Mohan (Telugu)',
         locale: 'te-IN',
         gender: 'Male',
         language: 'te',
+        languageName: 'Telugu',
         provider: 'microsoft',
         description: 'Telugu - Male'
       },
       {
         id: 'kn-IN-SapnaNeural',
+        voiceId: 13,
         name: 'Sapna (Kannada)',
+        voiceName: 'Sapna (Kannada)',
         locale: 'kn-IN',
         gender: 'Female',
         language: 'kn',
+        languageName: 'Kannada',
         provider: 'microsoft',
         description: 'Kannada - Female'
       },
       {
         id: 'ml-IN-MidhunNeural',
+        voiceId: 14,
         name: 'Midhun (Malayalam)',
+        voiceName: 'Midhun (Malayalam)',
         locale: 'ml-IN',
         gender: 'Male',
         language: 'ml',
+        languageName: 'Malayalam',
         provider: 'microsoft',
         description: 'Malayalam - Male'
       },
       {
         id: 'bn-IN-BashkarNeural',
+        voiceId: 15,
         name: 'Bashkar (Bengali)',
+        voiceName: 'Bashkar (Bengali)',
         locale: 'bn-IN',
         gender: 'Male',
         language: 'bn',
+        languageName: 'Bengali',
         provider: 'microsoft',
         description: 'Bengali - Male'
       },
       {
         id: 'pa-IN-GurleenNeural',
+        voiceId: 16,
         name: 'Gurleen (Punjabi)',
+        voiceName: 'Gurleen (Punjabi)',
         locale: 'pa-IN',
         gender: 'Female',
         language: 'pa',
+        languageName: 'Punjabi',
         provider: 'microsoft',
         description: 'Punjabi - Female'
       }
@@ -433,49 +481,12 @@ app.use('/audio', express.static('audio-output'));
 // 1. GET /api/voices - Get all available voices (only default ones)
 app.get('/api/voices', async (req, res) => {
   try {
-    const { language, gender } = req.query;
     let voices = await generator.getAvailableVoices();
-
-    // Apply filters if provided
-    if (language) {
-      voices = voices.filter(v => v.language === language);
-    }
-
-    if (gender) {
-      voices = voices.filter(v => v.gender.toLowerCase() === gender.toLowerCase());
-    }
-
-    // Group by language
-    const groupedByLanguage = voices.reduce((acc, voice) => {
-      if (!acc[voice.language]) {
-        acc[voice.language] = [];
-      }
-      acc[voice.language].push(voice);
-      return acc;
-    }, {});
-
-    // Group by gender
-    const groupedByGender = voices.reduce((acc, voice) => {
-      if (!acc[voice.gender]) {
-        acc[voice.gender] = [];
-      }
-      acc[voice.gender].push(voice);
-      return acc;
-    }, {});
 
     res.json({
       success: true,
       total: voices.length,
-      voices: voices,
-      grouped: {
-        byLanguage: groupedByLanguage,
-        byGender: groupedByGender
-      },
-      recommended: await generator.getRecommendedVoices(),
-      filters: {
-        languages: [...new Set(voices.map(v => v.language))],
-        genders: [...new Set(voices.map(v => v.gender))]
-      }
+      voices: voices
     });
   } catch (error) {
     res.status(500).json({
@@ -484,6 +495,59 @@ app.get('/api/voices', async (req, res) => {
     });
   }
 });
+// app.get('/api/voices', async (req, res) => {
+//   try {
+//     const { language, gender } = req.query;
+//     let voices = await generator.getAvailableVoices();
+
+//     // Apply filters if provided
+//     if (language) {
+//       voices = voices.filter(v => v.language === language);
+//     }
+
+//     if (gender) {
+//       voices = voices.filter(v => v.gender.toLowerCase() === gender.toLowerCase());
+//     }
+
+//     // Group by language
+//     const groupedByLanguage = voices.reduce((acc, voice) => {
+//       if (!acc[voice.language]) {
+//         acc[voice.language] = [];
+//       }
+//       acc[voice.language].push(voice);
+//       return acc;
+//     }, {});
+
+//     // Group by gender
+//     const groupedByGender = voices.reduce((acc, voice) => {
+//       if (!acc[voice.gender]) {
+//         acc[voice.gender] = [];
+//       }
+//       acc[voice.gender].push(voice);
+//       return acc;
+//     }, {});
+
+//     res.json({
+//       success: true,
+//       total: voices.length,
+//       voices: voices,
+//       grouped: {
+//         byLanguage: groupedByLanguage,
+//         byGender: groupedByGender
+//       },
+//       recommended: await generator.getRecommendedVoices(),
+//       filters: {
+//         languages: [...new Set(voices.map(v => v.language))],
+//         genders: [...new Set(voices.map(v => v.gender))]
+//       }
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       success: false,
+//       error: error.message
+//     });
+//   }
+// });
 
 // 2. GET /api/voices/:language - Get voices by language
 app.get('/api/voices/:language', async (req, res) => {
