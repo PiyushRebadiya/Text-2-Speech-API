@@ -27,7 +27,7 @@ class FestivalAudioGenerator {
     return [
       {
         id: 'en-US-AvaMultilingualNeural',
-        voiceId: 1,
+        voiceId: 'en-US-AvaMultilingualNeural',
         name: 'Ava (English US)',
         voiceName: 'Ava (English US)',
         locale: 'en-US',
@@ -39,7 +39,7 @@ class FestivalAudioGenerator {
       },
       {
         id: 'en-US-AndrewMultilingualNeural',
-        voiceId: 2,
+        voiceId: 'en-US-AndrewMultilingualNeural',
         name: 'Andrew (English US)',
         voiceName: 'Andrew (English US)',
         locale: 'en-US',
@@ -51,7 +51,7 @@ class FestivalAudioGenerator {
       },
       {
         id: 'en-GB-SoniaNeural',
-        voiceId: 3,
+        voiceId: 'en-GB-SoniaNeural',
         name: 'Sonia (English UK)',
         voiceName: 'Sonia (English UK)',
         locale: 'en-GB',
@@ -63,7 +63,7 @@ class FestivalAudioGenerator {
       },
       {
         id: 'en-GB-RyanNeural',
-        voiceId: 4,
+        voiceId: 'en-GB-RyanNeural',
         name: 'Ryan (English UK)',
         voiceName: 'Ryan (English UK)',
         locale: 'en-GB',
@@ -75,7 +75,7 @@ class FestivalAudioGenerator {
       },
       {
         id: 'hi-IN-SwaraNeural',
-        voiceId: 5,
+        voiceId: 'hi-IN-SwaraNeural',
         name: 'Swara (Hindi)',
         voiceName: 'Swara (Hindi)',
         locale: 'hi-IN',
@@ -87,7 +87,7 @@ class FestivalAudioGenerator {
       },
       {
         id: 'hi-IN-MadhurNeural',
-        voiceId: 6,
+        voiceId: 'hi-IN-MadhurNeural',
         name: 'Madhur (Hindi)',
         voiceName: 'Madhur (Hindi)',
         locale: 'hi-IN',
@@ -99,7 +99,7 @@ class FestivalAudioGenerator {
       },
       {
         id: 'gu-IN-DhwaniNeural',
-        voiceId: 7,
+        voiceId: 'gu-IN-DhwaniNeural',
         name: 'Dhwani (Gujarati)',
         voiceName: 'Dhwani (Gujarati)',
         locale: 'gu-IN',
@@ -111,7 +111,7 @@ class FestivalAudioGenerator {
       },
       {
         id: 'gu-IN-NiranjanNeural',
-        voiceId: 8,
+        voiceId: 'gu-IN-NiranjanNeural',
         name: 'Niranjan (Gujarati)',
         voiceName: 'Niranjan (Gujarati)',
         locale: 'gu-IN',
@@ -123,7 +123,7 @@ class FestivalAudioGenerator {
       },
       {
         id: 'mr-IN-AarohiNeural',
-        voiceId: 9,
+        voiceId: 'mr-IN-AarohiNeural',
         name: 'Aarohi (Marathi)',
         voiceName: 'Aarohi (Marathi)',
         locale: 'mr-IN',
@@ -135,7 +135,7 @@ class FestivalAudioGenerator {
       },
       {
         id: 'mr-IN-ManoharNeural',
-        voiceId: 10,
+        voiceId: 'mr-IN-ManoharNeural',
         name: 'Manohar (Marathi)',
         voiceName: 'Manohar (Marathi)',
         locale: 'mr-IN',
@@ -147,7 +147,7 @@ class FestivalAudioGenerator {
       },
       {
         id: 'ta-IN-PallaviNeural',
-        voiceId: 11,
+        voiceId: 'ta-IN-PallaviNeural',
         name: 'Pallavi (Tamil)',
         voiceName: 'Pallavi (Tamil)',
         locale: 'ta-IN',
@@ -159,7 +159,7 @@ class FestivalAudioGenerator {
       },
       {
         id: 'te-IN-MohanNeural',
-        voiceId: 12,
+        voiceId: 'te-IN-MohanNeural',
         name: 'Mohan (Telugu)',
         voiceName: 'Mohan (Telugu)',
         locale: 'te-IN',
@@ -171,7 +171,7 @@ class FestivalAudioGenerator {
       },
       {
         id: 'kn-IN-SapnaNeural',
-        voiceId: 13,
+        voiceId: 'kn-IN-SapnaNeural',
         name: 'Sapna (Kannada)',
         voiceName: 'Sapna (Kannada)',
         locale: 'kn-IN',
@@ -183,7 +183,7 @@ class FestivalAudioGenerator {
       },
       {
         id: 'ml-IN-MidhunNeural',
-        voiceId: 14,
+        voiceId: 'ml-IN-MidhunNeural',
         name: 'Midhun (Malayalam)',
         voiceName: 'Midhun (Malayalam)',
         locale: 'ml-IN',
@@ -195,7 +195,7 @@ class FestivalAudioGenerator {
       },
       {
         id: 'bn-IN-BashkarNeural',
-        voiceId: 15,
+        voiceId: 'bn-IN-BashkarNeural',
         name: 'Bashkar (Bengali)',
         voiceName: 'Bashkar (Bengali)',
         locale: 'bn-IN',
@@ -207,7 +207,7 @@ class FestivalAudioGenerator {
       },
       {
         id: 'pa-IN-GurleenNeural',
-        voiceId: 16,
+        voiceId: 'pa-IN-GurleenNeural',
         name: 'Gurleen (Punjabi)',
         voiceName: 'Gurleen (Punjabi)',
         locale: 'pa-IN',
