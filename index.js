@@ -706,9 +706,9 @@ app.post('/api/generate', async (req, res) => {
       format = 'wav', 
       rate = '+10%', 
       festivalType = 'generic',
-      backgroundMusic = false,  // New parameter
-      musicVolume = 0.3,        // New parameter
-      musicFile = 'melody.mp3'  // New parameter
+      backgroundMusic = false,
+      musicVolume = 0.3,
+      musicFile = 'melody.mp3'
     } = req.body;
 
     if (!text || text.trim().length === 0) {
@@ -740,7 +740,7 @@ app.post('/api/generate', async (req, res) => {
         outputFormat: format.toLowerCase(),
         includeMusic: true,
         backgroundMusic: musicFile,
-        musicVolume: Math.min(Math.max(parseFloat(musicVolume), 0.1), 1.0) // Clamp between 0.1 and 1.0
+        musicVolume: Math.min(Math.max(parseFloat(musicVolume), 0.1), 1.0)
       });
     } else {
       // Use original method without music
@@ -751,9 +751,61 @@ app.post('/api/generate', async (req, res) => {
       });
     }
 
+    // Try different possible property names
+    const filePath = result.mixedFile || result.outputFile || result.file;
+    
+    if (!filePath) {
+      throw new Error('No file path returned from generator');
+    }
+    // Clean the file path - remove leading ./ if present
+    const cleanFilePath = filePath.startsWith('./') ? filePath.substring(2) : filePath;
+    
+    // Construct the full path
+    const fullPath = path.join(__dirname, cleanFilePath);
+    // Check if file exists
+    if (!fs.existsSync(fullPath)) {
+      
+      // Check output directory for any recently created files
+      const outputDir = path.join(__dirname, 'output');
+      if (fs.existsSync(outputDir)) {
+        const files = fs.readdirSync(outputDir);
+        
+        // Find the most recently modified file
+        const recentFiles = files
+          .filter(f => f.includes('speech') || f.includes('audio'))
+          .map(f => {
+            const filePath = path.join(outputDir, f);
+            return {
+              name: f,
+              path: filePath,
+              mtime: fs.statSync(filePath).mtime.getTime()
+            };
+          })
+          .sort((a, b) => b.mtime - a.mtime);
+        
+        if (recentFiles.length > 0) {
+          const mostRecentPath = recentFiles[0].path;
+          
+          // Read the most recent file
+          const audioBuffer = fs.readFileSync(mostRecentPath);
+          const uint8Array = new Uint8Array(audioBuffer);
+          
+          const responseData = {
+            ...result,
+            file: mostRecentPath,
+            bodyBytes: Array.from(uint8Array),
+            note: 'Used most recent file from output directory'
+          };
+          
+          return res.json(responseData);
+        }
+      }
+      
+      throw new Error(`Generated file not found at: ${fullPath}`);
+    }
+
     // Read the file as binary data
-    const filePath = path.join(__dirname, result.file.replace('./', ''));
-    const audioBuffer = fs.readFileSync(filePath);
+    const audioBuffer = fs.readFileSync(fullPath);
     
     // Convert Buffer to Uint8Array for the response
     const uint8Array = new Uint8Array(audioBuffer);
@@ -761,6 +813,7 @@ app.post('/api/generate', async (req, res) => {
     // Add bodyBytes to result
     const responseData = {
       ...result,
+      file: fullPath,
       bodyBytes: Array.from(uint8Array)
     };
 
