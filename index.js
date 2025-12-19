@@ -12,10 +12,16 @@ class FestivalAudioGenerator {
   }
 
   ensureDirectories() {
-    const dirs = ['./audio-output', './temp-audio'];
+    const dirs = ['./audio-output', './temp-audio', './background-music'];
     dirs.forEach(dir => {
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     });
+    
+    // Check if background music directory exists, create if not
+    if (!fs.existsSync('./background-music')) {
+      fs.mkdirSync('./background-music', { recursive: true });
+      console.log('📁 Created background-music directory. Please add your melody.mp3 file there.');
+    }
   }
 
   // Get only default voices - NO edge-tts fetching
@@ -246,7 +252,186 @@ class FestivalAudioGenerator {
     return this.voices.some(voice => voice.id === voiceId);
   }
 
-  // Generate speech with specific voice (only from default list)
+  // Get available background music files
+  getAvailableBackgroundMusic() {
+    const musicDir = './background-music';
+    if (!fs.existsSync(musicDir)) return [];
+    
+    const files = fs.readdirSync(musicDir)
+      .filter(file => file.match(/\.(mp3|wav|ogg|m4a)$/i))
+      .map(file => ({
+        filename: file,
+        path: path.join(musicDir, file),
+        name: file.replace(/\.[^/.]+$/, ''),
+        format: path.extname(file).substring(1).toLowerCase()
+      }));
+    
+    return files;
+  }
+
+  // Mix voice with background music using ffmpeg
+  async mixWithBackgroundMusic(voiceFile, musicFile, outputFile, options = {}) {
+    const {
+      musicVolume = 0.3,  // Background music volume (30% by default)
+      voiceVolume = 1.0,   // Voice volume (100% by default)
+      fadeIn = 0.5,        // Fade in music in seconds
+      fadeOut = 1.0        // Fade out music in seconds
+    } = options;
+
+    // First, get the duration of the voice file
+    const voiceDuration = await this.getAudioDuration(voiceFile);
+    
+    // Create ffmpeg command to mix audio
+    // This uses sophisticated filtering to keep voice clear while having subtle background music
+    const command = `ffmpeg -i "${voiceFile}" -stream_loop -1 -i "${musicFile}" ` +
+      `-filter_complex ` +
+      `"[0:a]volume=${voiceVolume}[voice]; ` +
+      `[1:a]volume=${musicVolume}, ` +
+      `afade=t=in:st=0:d=${fadeIn}, ` +
+      `afade=t=out:st=${Math.max(0, voiceDuration - fadeOut)}:d=${fadeOut}[music]; ` +
+      `[voice][music]amix=inputs=2:duration=first:dropout_transition=0" ` +
+      `-c:a libmp3lame -q:a 2 -ar 44100 -ac 2 -y "${outputFile}"`;
+
+    console.log(`🎵 Mixing with background music: ${path.basename(musicFile)}`);
+    
+    return new Promise((resolve, reject) => {
+      exec(command, (error, stdout, stderr) => {
+        if (error) {
+          console.error('Audio mixing error:', stderr);
+          reject(new Error(`Failed to mix audio with background music: ${error.message}`));
+        } else {
+          resolve();
+        }
+      });
+    });
+  }
+
+  // Generate speech with background music option
+  async generateSpeechWithMusic(text, voiceId = 'en-US-AvaMultilingualNeural', options = {}) {
+    const { 
+      festivalType = 'generic', 
+      rate = '+10%', 
+      outputFormat = 'wav',
+      backgroundMusic = 'melody.mp3',
+      musicVolume = 0.3,
+      includeMusic = false  // New parameter to control background music
+    } = options;
+
+    // Validate voice
+    if (!this.validateVoice(voiceId)) {
+      throw new Error(`Voice "${voiceId}" is not in the available voice list. Use GET /api/voices to see available voices.`);
+    }
+
+    // Generate unique filename
+    const timestamp = Date.now();
+    const randomId = uuidv4().substring(0, 8);
+    const baseFilename = `tts_${festivalType}_${voiceId.replace(/[^a-zA-Z0-9]/g, '_')}_${timestamp}_${randomId}`;
+    const tempFile = `./temp-audio/${baseFilename}.mp3`;
+    const finalFile = `./audio-output/${baseFilename}_with_music.${outputFormat}`;
+    const voiceOnlyFile = `./audio-output/${baseFilename}.${outputFormat}`;
+
+    // Clean text for command line
+    const cleanedText = text
+      .replace(/"/g, '\\"')
+      .replace(/`/g, '\\`')
+      .replace(/\$/g, '\\$')
+      .replace(/\n/g, ' ')
+      .trim();
+
+    if (cleanedText.length === 0) {
+      throw new Error('Text cannot be empty');
+    }
+
+    if (cleanedText.length > 5000) {
+      throw new Error('Text too long (max 5000 characters)');
+    }
+
+    const command = `edge-tts --voice "${voiceId}" --text "${cleanedText}" --write-media "${tempFile}" --rate="${rate}"`;
+
+    console.log(`🔄 Generating speech: ${voiceId}, ${text.length} chars, Music: ${includeMusic ? 'Yes' : 'No'}`);
+
+    return new Promise((resolve, reject) => {
+      exec(command, async (error) => {
+        if (error) {
+          console.error('Edge TTS error:', error);
+          return reject(new Error(`Failed to generate speech with voice "${voiceId}". Make sure edge-tts is installed: pip install edge-tts`));
+        }
+
+        try {
+          let finalOutputFile;
+          let musicInfo = null;
+
+          // Check if background music is requested and available
+          if (includeMusic) {
+            const musicFiles = this.getAvailableBackgroundMusic();
+            let musicPath = `./background-music/${backgroundMusic}`;
+            
+            // Use default melody.mp3 if available
+            if (!fs.existsSync(musicPath) && musicFiles.length > 0) {
+              musicPath = musicFiles[0].path;
+              console.log(`Using available background music: ${musicFiles[0].filename}`);
+            }
+            
+            if (fs.existsSync(musicPath)) {
+              // Convert temp file to desired format first
+              await this.convertAudio(tempFile, voiceOnlyFile, outputFormat);
+              
+              // Mix with background music
+              await this.mixWithBackgroundMusic(
+                voiceOnlyFile, 
+                musicPath, 
+                finalFile,
+                { musicVolume }
+              );
+              
+              finalOutputFile = finalFile;
+              musicInfo = {
+                filename: path.basename(musicPath),
+                volume: musicVolume,
+                mixed: true
+              };
+              
+              // Clean up voice-only file
+              fs.unlink(voiceOnlyFile, () => {});
+            } else {
+              console.log('⚠️ Background music not found, generating voice-only audio');
+              // Fallback to voice-only if music not found
+              await this.convertAudio(tempFile, voiceOnlyFile, outputFormat);
+              finalOutputFile = voiceOnlyFile;
+            }
+          } else {
+            // Generate voice-only audio
+            await this.convertAudio(tempFile, voiceOnlyFile, outputFormat);
+            finalOutputFile = voiceOnlyFile;
+          }
+
+          // Clean up temp file
+          fs.unlink(tempFile, () => {});
+
+          const result = {
+            success: true,
+            file: finalOutputFile,
+            filename: path.basename(finalOutputFile),
+            format: outputFormat,
+            voice: voiceId,
+            voiceInfo: this.voices.find(v => v.id === voiceId),
+            textLength: text.length,
+            downloadUrl: `/api/download/${path.basename(finalOutputFile)}`,
+            streamUrl: `/api/stream/${path.basename(finalOutputFile)}`,
+            festivalType: festivalType,
+            timestamp: timestamp,
+            backgroundMusic: musicInfo
+          };
+
+          resolve(result);
+        } catch (convertError) {
+          reject(new Error(`Failed to process audio: ${convertError.message}`));
+        }
+      });
+    });
+  }
+
+  // Original generateSpeech method (without music)
   async generateSpeech(text, voiceId = 'en-US-AvaMultilingualNeural', options = {}) {
     const { festivalType = 'generic', rate = '+10%', outputFormat = 'wav' } = options;
 
@@ -307,7 +492,8 @@ class FestivalAudioGenerator {
                 downloadUrl: `/api/download/${filename}.${outputFormat}`,
                 streamUrl: `/api/stream/${filename}.${outputFormat}`,
                 festivalType: festivalType,
-                timestamp: timestamp
+                timestamp: timestamp,
+                backgroundMusic: null
               });
             })
             .catch(convertError => {
@@ -332,7 +518,8 @@ class FestivalAudioGenerator {
                   downloadUrl: `/api/download/${filename}.mp3`,
                   streamUrl: `/api/stream/${filename}.mp3`,
                   festivalType: festivalType,
-                  timestamp: timestamp
+                  timestamp: timestamp,
+                  backgroundMusic: null
                 });
               });
             } else {
@@ -347,7 +534,8 @@ class FestivalAudioGenerator {
                 downloadUrl: `/api/download/${filename}.mp3`,
                 streamUrl: `/api/stream/${filename}.mp3`,
                 festivalType: festivalType,
-                timestamp: timestamp
+                timestamp: timestamp,
+                backgroundMusic: null
               });
             }
           });
@@ -356,11 +544,10 @@ class FestivalAudioGenerator {
     });
   }
 
-  // Rest of the methods remain the same (convertAudio, getAudioDuration, etc.)
-  // Convert audio format - FIXED VERSION
+  // Convert audio format
   async convertAudio(inputFile, outputFile, format = 'wav') {
     const formats = {
-      wav: 'pcm_s16le',  // Changed from 'wav' to 'pcm_s16le'
+      wav: 'pcm_s16le',
       mp3: 'libmp3lame',
       ogg: 'libvorbis',
       m4a: 'aac',
@@ -371,7 +558,6 @@ class FestivalAudioGenerator {
       throw new Error(`Unsupported format: ${format}`);
     }
 
-    // Different command for WAV format
     let command;
     if (format === 'wav') {
       command = `ffmpeg -i "${inputFile}" -c:a ${formats[format]} -ar 44100 -ac 2 "${outputFile}"`;
@@ -434,7 +620,6 @@ class FestivalAudioGenerator {
 const app = express();
 const generator = new FestivalAudioGenerator();
 
-
 const os = require('os');
 
 const LOG_DIR = path.join(__dirname, 'logs');
@@ -456,7 +641,6 @@ function logError(message, error) {
   fs.appendFileSync(path.join(LOG_DIR, 'error.log'), logLine);
 }
 
-
 log('🚀 Server Boot Info', {
   node: process.version,
   platform: process.platform,
@@ -466,8 +650,6 @@ log('🚀 Server Boot Info', {
   PATH: process.env.PATH
 });
 
-
-
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
@@ -475,14 +657,14 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Serve static files
 app.use('/audio', express.static('audio-output'));
+app.use('/background-music', express.static('background-music'));
 
 // API Routes
 
-// 1. GET /api/voices - Get all available voices (only default ones)
+// 1. GET /api/voices - Get all available voices
 app.get('/api/voices', async (req, res) => {
   try {
     let voices = await generator.getAvailableVoices();
-
     res.json({
       success: true,
       total: voices.length,
@@ -495,79 +677,17 @@ app.get('/api/voices', async (req, res) => {
     });
   }
 });
-// app.get('/api/voices', async (req, res) => {
-//   try {
-//     const { language, gender } = req.query;
-//     let voices = await generator.getAvailableVoices();
 
-//     // Apply filters if provided
-//     if (language) {
-//       voices = voices.filter(v => v.language === language);
-//     }
-
-//     if (gender) {
-//       voices = voices.filter(v => v.gender.toLowerCase() === gender.toLowerCase());
-//     }
-
-//     // Group by language
-//     const groupedByLanguage = voices.reduce((acc, voice) => {
-//       if (!acc[voice.language]) {
-//         acc[voice.language] = [];
-//       }
-//       acc[voice.language].push(voice);
-//       return acc;
-//     }, {});
-
-//     // Group by gender
-//     const groupedByGender = voices.reduce((acc, voice) => {
-//       if (!acc[voice.gender]) {
-//         acc[voice.gender] = [];
-//       }
-//       acc[voice.gender].push(voice);
-//       return acc;
-//     }, {});
-
-//     res.json({
-//       success: true,
-//       total: voices.length,
-//       voices: voices,
-//       grouped: {
-//         byLanguage: groupedByLanguage,
-//         byGender: groupedByGender
-//       },
-//       recommended: await generator.getRecommendedVoices(),
-//       filters: {
-//         languages: [...new Set(voices.map(v => v.language))],
-//         genders: [...new Set(voices.map(v => v.gender))]
-//       }
-//     });
-//   } catch (error) {
-//     res.status(500).json({
-//       success: false,
-//       error: error.message
-//     });
-//   }
-// });
-
-// 2. GET /api/voices/:language - Get voices by language
-app.get('/api/voices/:language', async (req, res) => {
+// 2. GET /api/background-music - Get available background music
+app.get('/api/background-music', (req, res) => {
   try {
-    const { language } = req.params;
-    const voices = await generator.getVoicesByLanguage(language);
-
-    if (voices.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: `No voices found for language: ${language}`,
-        availableLanguages: ['en', 'hi', 'gu', 'mr', 'ta', 'te', 'kn', 'ml', 'bn', 'pa']
-      });
-    }
-
+    const musicFiles = generator.getAvailableBackgroundMusic();
     res.json({
       success: true,
-      language: language,
-      total: voices.length,
-      voices: voices
+      total: musicFiles.length,
+      music: musicFiles,
+      default: 'melody.mp3',
+      tip: 'Place your background music files in ./background-music/ directory'
     });
   } catch (error) {
     res.status(500).json({
@@ -577,29 +697,19 @@ app.get('/api/voices/:language', async (req, res) => {
   }
 });
 
-// 3. GET /api/voices/recommended - Get recommended voices
-app.get('/api/voices/recommended', async (req, res) => {
-  try {
-    const voices = await generator.getRecommendedVoices();
-
-    res.json({
-      success: true,
-      total: voices.length,
-      voices: voices,
-      message: 'Top 5 recommended voices for festival messages'
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
-
-// 4. POST /api/generate - Generate speech from text
+// 3. POST /api/generate - Generate speech from text (with optional background music)
 app.post('/api/generate', async (req, res) => {
   try {
-    const { text, voice, format = 'wav', rate = '+10%', festivalType = 'generic' } = req.body;
+    const { 
+      text, 
+      voice, 
+      format = 'wav', 
+      rate = '+10%', 
+      festivalType = 'generic',
+      backgroundMusic = false,  // New parameter
+      musicVolume = 0.3,        // New parameter
+      musicFile = 'melody.mp3'  // New parameter
+    } = req.body;
 
     if (!text || text.trim().length === 0) {
       return res.status(400).json({
@@ -620,15 +730,29 @@ app.post('/api/generate', async (req, res) => {
       });
     }
 
-    // Generate speech
-    const result = await generator.generateSpeech(text, voiceToUse, {
-      festivalType,
-      rate,
-      outputFormat: format.toLowerCase()
-    });
+    let result;
+    
+    // Use new method with background music if requested
+    if (backgroundMusic) {
+      result = await generator.generateSpeechWithMusic(text, voiceToUse, {
+        festivalType,
+        rate,
+        outputFormat: format.toLowerCase(),
+        includeMusic: true,
+        backgroundMusic: musicFile,
+        musicVolume: Math.min(Math.max(parseFloat(musicVolume), 0.1), 1.0) // Clamp between 0.1 and 1.0
+      });
+    } else {
+      // Use original method without music
+      result = await generator.generateSpeech(text, voiceToUse, {
+        festivalType,
+        rate,
+        outputFormat: format.toLowerCase()
+      });
+    }
 
     // Read the file as binary data
-    const filePath = path.join(__dirname, 'audio-output', result.filename);
+    const filePath = path.join(__dirname, result.file.replace('./', ''));
     const audioBuffer = fs.readFileSync(filePath);
     
     // Convert Buffer to Uint8Array for the response
@@ -637,7 +761,7 @@ app.post('/api/generate', async (req, res) => {
     // Add bodyBytes to result
     const responseData = {
       ...result,
-      bodyBytes: Array.from(uint8Array) // Convert Uint8Array to array for JSON serialization
+      bodyBytes: Array.from(uint8Array)
     };
 
     res.json(responseData);
@@ -652,7 +776,7 @@ app.post('/api/generate', async (req, res) => {
   }
 });
 
-// 5. GET /api/generate/quick - Quick generation with query parameters
+// 4. GET /api/generate/quick - Quick generation with query parameters
 app.get('/api/generate/quick', async (req, res) => {
   log('➡️ /api/generate/quick called', {
     query: req.query,
@@ -661,23 +785,48 @@ app.get('/api/generate/quick', async (req, res) => {
   });
 
   try {
-    const { text, voice = 'en-US-AvaMultilingualNeural', format = 'wav' } = req.query;
+    const { 
+      text, 
+      voice = 'en-US-AvaMultilingualNeural', 
+      format = 'wav',
+      backgroundMusic = 'false',
+      musicVolume = '0.3'
+    } = req.query;
 
     if (!text) {
       log('⚠️ Missing text param');
       return res.status(400).json({ success: false, error: 'Text parameter is required' });
     }
 
-    log('🧪 Starting TTS', { textLength: text.length, voice, format });
-
-    const result = await generator.generateSpeech(text, voice, {
-      outputFormat: format.toLowerCase()
+    log('🧪 Starting TTS', { 
+      textLength: text.length, 
+      voice, 
+      format,
+      backgroundMusic,
+      musicVolume 
     });
+
+    let result;
+    
+    // Check if background music is requested
+    const includeMusic = backgroundMusic.toLowerCase() === 'true';
+    
+    if (includeMusic) {
+      result = await generator.generateSpeechWithMusic(text, voice, {
+        outputFormat: format.toLowerCase(),
+        includeMusic: true,
+        musicVolume: Math.min(Math.max(parseFloat(musicVolume), 0.1), 1.0)
+      });
+    } else {
+      result = await generator.generateSpeech(text, voice, {
+        outputFormat: format.toLowerCase()
+      });
+    }
 
     log('✅ TTS completed', result);
 
     // Read the file as binary data
-    const filePath = path.join(__dirname, 'audio-output', result.filename);
+    const filePath = path.join(__dirname, result.file.replace('./', ''));
     const audioBuffer = fs.readFileSync(filePath);
     
     // Convert Buffer to Uint8Array for the response
@@ -686,7 +835,7 @@ app.get('/api/generate/quick', async (req, res) => {
     // Add bodyBytes to result
     const responseData = {
       ...result,
-      bodyBytes: Array.from(uint8Array) // Convert Uint8Array to array for JSON serialization
+      bodyBytes: Array.from(uint8Array)
     };
 
     if (req.query.download === 'true') {
@@ -705,7 +854,7 @@ app.get('/api/generate/quick', async (req, res) => {
   }
 });
 
-// 6. GET /api/stream/:filename - Stream audio file
+// 5. GET /api/stream/:filename - Stream audio file
 app.get('/api/stream/:filename', (req, res) => {
   const filename = req.params.filename;
   const filePath = path.join('./audio-output', filename);
@@ -760,7 +909,7 @@ app.get('/api/stream/:filename', (req, res) => {
   }
 });
 
-// 7. GET /api/download/:filename - Download audio file
+// 6. GET /api/download/:filename - Download audio file
 app.get('/api/download/:filename', (req, res) => {
   const filename = req.params.filename;
   const filePath = path.join('./audio-output', filename);
@@ -787,10 +936,18 @@ app.get('/api/download/:filename', (req, res) => {
   const voiceId = voiceMatch ? voiceMatch[1] : 'unknown';
   const voiceInfo = generator.voices.find(v => v.id === voiceId);
 
+  // Check if file has background music
+  const hasMusic = filename.includes('_with_music');
+  
   // Create a friendly filename for download
-  const friendlyName = voiceInfo ?
-    `festival_${voiceInfo.language}_${voiceInfo.gender}.${ext.substring(1)}` :
-    `festival_audio.${ext.substring(1)}`;
+  let friendlyName;
+  if (voiceInfo) {
+    friendlyName = `festival_${voiceInfo.language}_${voiceInfo.gender}`;
+    if (hasMusic) friendlyName += '_with_music';
+    friendlyName += `.${ext.substring(1)}`;
+  } else {
+    friendlyName = hasMusic ? `festival_audio_with_music.${ext.substring(1)}` : `festival_audio.${ext.substring(1)}`;
+  }
 
   res.setHeader('Content-Type', contentType);
   res.setHeader('Content-Disposition', `attachment; filename="${friendlyName}"`);
@@ -799,25 +956,30 @@ app.get('/api/download/:filename', (req, res) => {
   fileStream.pipe(res);
 });
 
-// 8. GET /api/status - API status
+// 7. GET /api/status - API status
 app.get('/api/status', async (req, res) => {
   try {
     const voices = await generator.getAvailableVoices();
+    const backgroundMusic = generator.getAvailableBackgroundMusic();
 
     res.json({
       success: true,
       status: 'operational',
-      version: '1.0.0',
+      version: '1.1.0',  // Updated version
       voices: {
         total: voices.length,
         languages: [...new Set(voices.map(v => v.language))],
         default: 'en-US-AvaMultilingualNeural'
       },
+      backgroundMusic: {
+        available: backgroundMusic.length > 0,
+        files: backgroundMusic.map(m => m.filename),
+        default: 'melody.mp3'
+      },
       endpoints: [
         'GET /api/voices - List available voices',
-        'GET /api/voices/:language - Voices by language',
-        'GET /api/voices/recommended - Recommended voices',
-        'POST /api/generate - Generate speech (JSON)',
+        'GET /api/background-music - List available background music',
+        'POST /api/generate - Generate speech (JSON body)',
         'GET /api/generate/quick - Quick generation',
         'GET /api/stream/:filename - Stream audio',
         'GET /api/download/:filename - Download audio',
@@ -826,10 +988,13 @@ app.get('/api/status', async (req, res) => {
       features: [
         '16 pre-defined high-quality voices',
         'Multiple Indian languages support',
+        'Background music mixing (30% volume by default)',
+        'Voice clarity preservation',
         'Multiple audio formats (WAV, MP3, OGG, M4A, FLAC)',
         'Festival-specific audio generation',
         'Rate/speed control',
-        'Batch processing available'
+        'Background music volume control',
+        'Fade in/out effects'
       ]
     });
   } catch (error) {
@@ -857,6 +1022,7 @@ app.use((req, res) => {
     error: 'Endpoint not found',
     availableEndpoints: [
       'GET /api/voices',
+      'GET /api/background-music',
       'POST /api/generate',
       'GET /api/generate/quick',
       'GET /api/status'
@@ -871,30 +1037,47 @@ app.listen(PORT, () => {
 🎉 Festival TTS API Server Started!
 📡 Using ONLY predefined voices (NO edge-tts voice fetching)
 
+🎵 NEW FEATURE: Background Music Support
+   Place your melody.mp3 in ./background-music/ directory
+
 📊 Available Voices: 16 voices across 10 languages
 🌐 API Base URL: http://localhost:${PORT}
 
 📡 API Endpoints:
    GET  /api/voices                 - List all 16 available voices
-   GET  /api/voices/:language       - Filter voices by language
-   GET  /api/voices/recommended     - Get recommended voices
-   POST /api/generate               - Generate speech (JSON body)
+   GET  /api/background-music       - List available background music
+   POST /api/generate               - Generate speech with background music option
    GET  /api/generate/quick         - Quick generation (query params)
    GET  /api/download/:filename     - Download audio file
    GET  /api/stream/:filename       - Stream audio file
    GET  /api/status                 - API status
 
 🎯 Default Voice: en-US-AvaMultilingualNeural
+🎵 Background Music: Optional (30% volume by default)
 🎨 Supported Formats: WAV, MP3, OGG, M4A, FLAC
-🌍 Supported Languages: English, Hindi, Gujarati, Marathi, Tamil, Telugu, Kannada, Malayalam, Bengali, Punjabi
 
-💡 Quick Test:
+💡 Quick Test with Music:
+   curl "http://localhost:${PORT}/api/generate/quick?text=Happy%20Diwali&voice=hi-IN-SwaraNeural&format=mp3&backgroundMusic=true&musicVolume=0.3"
+
+💡 Quick Test without Music:
    curl "http://localhost:${PORT}/api/generate/quick?text=Happy%20Diwali&voice=hi-IN-SwaraNeural&format=mp3"
 
 🔧 Prerequisites:
    pip install edge-tts
-   ffmpeg installed (for audio conversion)
+   ffmpeg installed (for audio conversion and mixing)
   `);
+
+  // Check for background music
+  const musicFiles = generator.getAvailableBackgroundMusic();
+  if (musicFiles.length === 0) {
+    console.log(`
+⚠️  No background music found!
+   Please add your melody.mp3 to ./background-music/ directory
+   Or use the API without background music
+    `);
+  } else {
+    console.log(`✅ Found ${musicFiles.length} background music file(s): ${musicFiles.map(m => m.filename).join(', ')}`);
+  }
 
   // Clean old files every hour
   setInterval(() => {
